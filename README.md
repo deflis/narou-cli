@@ -4,6 +4,34 @@
 
 ## インストール
 
+### リリースバイナリを使う
+
+[GitHub Releases](https://github.com/deflis/narou-cli/releases) から、環境に合うバイナリをダウンロードして実行できます。Bunのインストールは不要です。
+
+| OS | CPU | バイナリ |
+| --- | --- | --- |
+| Linux | x64 | `narou-linux-x64` |
+| Linux | arm64 | `narou-linux-arm64` |
+| macOS | Intel | `narou-darwin-x64` |
+| macOS | Apple Silicon | `narou-darwin-arm64` |
+| Windows | x64 | `narou-windows-x64.exe` |
+
+macOS / Linuxでは、ダウンロード後に実行権限を付けてください。
+
+```bash
+chmod +x ./narou-*
+./narou-darwin-arm64 search 異世界
+```
+
+必要に応じて `narou` にリネームし、PATHの通ったディレクトリへ配置するとそのまま実行できます。
+
+```bash
+mv ./narou-darwin-arm64 /usr/local/bin/narou
+narou search 異世界
+```
+
+### 開発環境から使う
+
 ```bash
 bun install
 ```
@@ -91,3 +119,17 @@ bun run build
 ```bash
 ./narou search 異世界
 ```
+
+## Skills
+
+このリポジトリには、エージェントから `narou` CLIを使って分析用データを準備するためのSkillを同梱しています。
+
+- `skills/narou-analysis-prep`: 小説検索、ランキング、殿堂入り履歴、ユーザ検索のJSON取得、ページング、フィールド選択、raw/derivedデータの分離、再現用manifest作成を支援するSkill
+
+利用時は、プロンプトで `$narou-analysis-prep` を指定します。
+
+```text
+Use $narou-analysis-prep to prepare 小説家になろう data for later analysis.
+```
+
+このSkillは分析前のデータ取得・整形までを対象とし、ランキングの解釈、作品評価、モデル作成、可視化などは対象外です。
