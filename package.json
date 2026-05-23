@@ -5,7 +5,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build": "bun build --compile --minify --sourcemap ./index.ts --outfile narou"
+    "build": "bun build --compile --minify --sourcemap ./index.ts --outfile narou",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage"
   },
   "devDependencies": {
     "@types/bun": "latest"
