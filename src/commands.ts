@@ -104,7 +104,10 @@ async function runSearch(args: string[]): Promise<void> {
   if (values.ncode) builder.ncode(values.ncode);
   if (values["user-id"]) builder.userId(parseNumberOption(values["user-id"], "user-id"));
   if (values.type) builder.type(parseNovelType(values.type));
-  if (values.fields) builder.fields(toNarouFields(fields));
+  const narouFields = toNarouFields(fields);
+  const optionalFields = toNarouOptionalFields(fields);
+  if (narouFields.length > 0) builder.fields(narouFields);
+  if (optionalFields.length > 0) builder.opt(optionalFields);
 
   const result = await builder.execute();
   printSearchResults(result, format, fields);
@@ -134,7 +137,13 @@ async function runRanking(args: string[]): Promise<void> {
   if (values.date) builder.date(parseLocalDate(values.date));
 
   const detailFields = toRankingDetailFields(fields);
-  const result = detailFields.length > 0 ? await builder.executeWithFields(detailFields) : await builder.execute();
+  const optionalFields = toNarouOptionalFields(fields);
+  const result =
+    optionalFields.length > 0
+      ? await builder.executeWithFields(detailFields, optionalFields)
+      : detailFields.length > 0
+        ? await builder.executeWithFields(detailFields)
+        : await builder.execute();
   printRankingResults(result, format, fields);
 }
 
@@ -216,11 +225,11 @@ function rankingTypeCode(value: RankingTypeOption): "d" | "w" | "m" | "q" {
 }
 
 function parseNovelOutputFields(value: string): OutputFields {
-  return parseOutputFields(value, Object.keys(narou.Fields));
+  return parseOutputFields(value, [...Object.keys(narou.Fields), ...Object.keys(narou.OptionalFields)]);
 }
 
 function parseRankingOutputFields(value: string): OutputFields {
-  return parseOutputFields(value, ["rank", "pt", ...Object.keys(narou.Fields)]);
+  return parseOutputFields(value, ["rank", "pt", ...Object.keys(narou.Fields), ...Object.keys(narou.OptionalFields)]);
 }
 
 function parseRankingHistoryOutputFields(value: string): OutputFields {
@@ -233,6 +242,12 @@ function parseUserOutputFields(value: string): OutputFields {
 
 function toNarouFields(fields: readonly string[]): narou.Fields[] {
   return fields.map((field) => narou.Fields[field as keyof typeof narou.Fields]).filter((field) => field !== undefined);
+}
+
+function toNarouOptionalFields(fields: readonly string[]): narou.OptionalFields[] {
+  return fields
+    .map((field) => narou.OptionalFields[field as keyof typeof narou.OptionalFields])
+    .filter((field) => field !== undefined);
 }
 
 function toRankingDetailFields(fields: OutputFields): narou.Fields[] {
