@@ -5,6 +5,7 @@ import { OutputFormats, printRankingHistory, printRankingResults, printSearchRes
 import type { OutputFormat } from "./output";
 import {
   CliArgumentError,
+  outputFields,
   parseBigGenre,
   parseGenre,
   parseLocalDate,
@@ -12,11 +13,17 @@ import {
   parseNovelType,
   parseNumberOption,
   parseOrder,
+  parseOutputFields,
   parseRankingType,
 } from "./parsers";
-import type { RankingTypeOption } from "./parsers";
+import type { OutputFields, RankingTypeOption } from "./parsers";
 
 const VERSION = packageJson.version;
+const SEARCH_DEFAULT_FIELDS = outputFields(["ncode", "title", "writer", "global_point", "length"]);
+const RANKING_DEFAULT_FIELDS = outputFields(["rank", "ncode", "pt"]);
+const RANKING_HISTORY_DEFAULT_FIELDS = outputFields(["type", "date", "rank", "pt"]);
+const USER_DEFAULT_FIELDS = outputFields(["userid", "name", "novel_cnt", "sum_global_point"]);
+const RANKING_BASE_FIELDS = new Set(["rank", "ncode", "pt"]);
 
 export async function runCli(args: string[] = Bun.argv.slice(2)): Promise<void> {
   try {
@@ -76,6 +83,7 @@ async function runSearch(args: string[]): Promise<void> {
       "user-id": { type: "string" },
       type: { type: "string" },
       output: { type: "string", short: "o", default: "table" },
+      fields: { type: "string" },
       help: { type: "boolean", short: "h" },
     },
   });
@@ -86,6 +94,7 @@ async function runSearch(args: string[]): Promise<void> {
   }
 
   const format = outputFormat(values.output);
+  const fields = values.fields ? parseNovelOutputFields(values.fields) : SEARCH_DEFAULT_FIELDS;
   const builder = narou.search(positionals[0]);
   if (values.limit) builder.limit(parseNumberOption(values.limit, "limit"));
   if (values.start) builder.start(parseNumberOption(values.start, "start"));
@@ -95,9 +104,10 @@ async function runSearch(args: string[]): Promise<void> {
   if (values.ncode) builder.ncode(values.ncode);
   if (values["user-id"]) builder.userId(parseNumberOption(values["user-id"], "user-id"));
   if (values.type) builder.type(parseNovelType(values.type));
+  if (values.fields) builder.fields(toNarouFields(fields));
 
   const result = await builder.execute();
-  printSearchResults(result, format);
+  printSearchResults(result, format, fields);
 }
 
 async function runRanking(args: string[]): Promise<void> {
@@ -107,6 +117,7 @@ async function runRanking(args: string[]): Promise<void> {
       type: { type: "string", default: "daily" },
       date: { type: "string" },
       output: { type: "string", short: "o", default: "table" },
+      fields: { type: "string" },
       help: { type: "boolean", short: "h" },
     },
   });
@@ -117,12 +128,14 @@ async function runRanking(args: string[]): Promise<void> {
   }
 
   const format = outputFormat(values.output);
+  const fields = values.fields ? parseRankingOutputFields(values.fields) : RANKING_DEFAULT_FIELDS;
   const builder = narou.ranking();
   builder.type(rankingTypeCode(parseRankingType(values.type)));
   if (values.date) builder.date(parseLocalDate(values.date));
 
-  const result = await builder.executeWithFields(narou.Fields.title);
-  printRankingResults(result, format);
+  const detailFields = toRankingDetailFields(fields);
+  const result = detailFields.length > 0 ? await builder.executeWithFields(detailFields) : await builder.execute();
+  printRankingResults(result, format, fields);
 }
 
 async function runRankHistory(args: string[]): Promise<void> {
@@ -131,6 +144,7 @@ async function runRankHistory(args: string[]): Promise<void> {
     allowPositionals: true,
     options: {
       output: { type: "string", short: "o", default: "table" },
+      fields: { type: "string" },
       help: { type: "boolean", short: "h" },
     },
   });
@@ -141,10 +155,11 @@ async function runRankHistory(args: string[]): Promise<void> {
   }
 
   const format = outputFormat(values.output);
+  const fields = values.fields ? parseRankingHistoryOutputFields(values.fields) : RANKING_HISTORY_DEFAULT_FIELDS;
   const ncode = parseNCode(positionals[0]);
 
   const result = await narou.rankingHistory(ncode);
-  printRankingHistory(result, format);
+  printRankingHistory(result, format, fields);
 }
 
 async function runSearchUser(args: string[]): Promise<void> {
@@ -155,6 +170,7 @@ async function runSearchUser(args: string[]): Promise<void> {
       "user-id": { type: "string" },
       limit: { type: "string", short: "l" },
       output: { type: "string", short: "o", default: "table" },
+      fields: { type: "string" },
       help: { type: "boolean", short: "h" },
     },
   });
@@ -165,12 +181,14 @@ async function runSearchUser(args: string[]): Promise<void> {
   }
 
   const format = outputFormat(values.output);
+  const fields = values.fields ? parseUserOutputFields(values.fields) : USER_DEFAULT_FIELDS;
   const builder = narou.searchUser(positionals[0]);
   if (values.limit) builder.limit(parseNumberOption(values.limit, "limit"));
   if (values["user-id"]) builder.userId(parseNumberOption(values["user-id"], "user-id"));
+  if (values.fields) builder.fields(toNarouUserFields(fields));
 
   const result = await builder.execute();
-  printUserResults(result, format);
+  printUserResults(result, format, fields);
 }
 
 function outputFormat(value: string | boolean | undefined): OutputFormat {
@@ -195,6 +213,34 @@ function rankingTypeCode(value: RankingTypeOption): "d" | "w" | "m" | "q" {
       return "q";
   }
   throw new CliArgumentError(`Invalid ranking type: ${value}`);
+}
+
+function parseNovelOutputFields(value: string): OutputFields {
+  return parseOutputFields(value, Object.keys(narou.Fields));
+}
+
+function parseRankingOutputFields(value: string): OutputFields {
+  return parseOutputFields(value, ["rank", "pt", ...Object.keys(narou.Fields)]);
+}
+
+function parseRankingHistoryOutputFields(value: string): OutputFields {
+  return parseOutputFields(value, ["type", "date", "rank", "pt"]);
+}
+
+function parseUserOutputFields(value: string): OutputFields {
+  return parseOutputFields(value, Object.keys(narou.UserFields));
+}
+
+function toNarouFields(fields: readonly string[]): narou.Fields[] {
+  return fields.map((field) => narou.Fields[field as keyof typeof narou.Fields]).filter((field) => field !== undefined);
+}
+
+function toRankingDetailFields(fields: OutputFields): narou.Fields[] {
+  return toNarouFields(fields.filter((field) => !RANKING_BASE_FIELDS.has(field)));
+}
+
+function toNarouUserFields(fields: readonly string[]): narou.UserFields[] {
+  return fields.map((field) => narou.UserFields[field as keyof typeof narou.UserFields]).filter((field) => field !== undefined);
 }
 
 function isParseArgsError(error: unknown): error is Error {
@@ -232,6 +278,7 @@ Options:
   --user-id <id>                  ユーザID
   --type <type>                   小説タイプ (t/r/er/re/ter)
   -o, --output <format>           出力形式 (json/table)
+  --fields <fields>               出力フィールド (カンマ区切り)
   -h, --help                      display help for command`);
 }
 
@@ -244,6 +291,7 @@ Options:
   --type <type>                   ランキング種別 (daily/weekly/monthly/quarterly)
   --date <date>                   集計日 (YYYY-MM-DD)
   -o, --output <format>           出力形式 (json/table)
+  --fields <fields>               出力フィールド (カンマ区切り)
   -h, --help                      display help for command`);
 }
 
@@ -254,6 +302,7 @@ function printRankHistoryHelp(): void {
 
 Options:
   -o, --output <format>           出力形式 (json/table)
+  --fields <fields>               出力フィールド (カンマ区切り)
   -h, --help                      display help for command`);
 }
 
@@ -266,5 +315,6 @@ Options:
   --user-id <id>                  ユーザID
   -l, --limit <n>                 取得件数
   -o, --output <format>           出力形式 (json/table)
+  --fields <fields>               出力フィールド (カンマ区切り)
   -h, --help                      display help for command`);
 }
