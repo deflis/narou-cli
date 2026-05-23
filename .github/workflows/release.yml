@@ -35,7 +35,7 @@ jobs:
 
       - uses: flatt-security/setup-takumi-guard-npm@9a5d797c2085b6326d3a2985c08e3a114b9b88c1 # v1.1.1
 
-      - run: bun install
+      - run: bun install --frozen-lockfile
 
       - run: bun build --compile --minify --sourcemap --target=${{ matrix.target }} ./index.ts --outfile ${{ matrix.asset }}
 
