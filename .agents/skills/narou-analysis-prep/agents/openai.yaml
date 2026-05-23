@@ -1,0 +1,4 @@
+interface:
+  display_name: "Narou Analysis Prep"
+  short_description: "なろう作品分析前のデータ準備"
+  default_prompt: "Use $narou-analysis-prep to prepare 小説家になろう data for later analysis."
