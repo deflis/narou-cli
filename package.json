@@ -1,0 +1,19 @@
+{
+  "name": "narou-cli",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "bun build --compile --minify --sourcemap ./index.ts --outfile narou"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "commander": "^14.0.3",
+    "narou": "^2.0.1"
+  }
+}

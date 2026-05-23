@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - target: bun-linux-x64
+            asset: narou-linux-x64
+          - target: bun-linux-arm64
+            asset: narou-linux-arm64
+          - target: bun-darwin-x64
+            asset: narou-darwin-x64
+          - target: bun-darwin-arm64
+            asset: narou-darwin-arm64
+          - target: bun-windows-x64
+            asset: narou-windows-x64.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
+      - run: bun install
+
+      - run: bun build --compile --minify --sourcemap --target=${{ matrix.target }} ./index.ts --outfile ${{ matrix.asset }}
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.asset }}
