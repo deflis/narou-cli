@@ -1,0 +1,44 @@
+name: Version Bump
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Bump type or explicit version"
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aaae5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Bump version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          bun x --bun npm version ${{ inputs.version }} --no-git-tag-version
+          VERSION=$(bun -e "console.log(JSON.parse(await Bun.file('package.json').text()).version)")
+          git add package.json
+          git commit -m "chore: bump version to v$VERSION"
+          git tag "v$VERSION"
+
+      - name: Push changes
+        run: |
+          git push origin main --follow-tags
